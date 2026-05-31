@@ -23,21 +23,27 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Реализация сервиса управления бронированиями.
+ * Содержит основную бизнес-логику проверок ограничений при записи в бассейн.
+ */
 @Slf4j
 @RequiredArgsConstructor
 @Service
 public class ReservationServiceImpl implements ReservationService {
-
     private final ReservationRepository reservationRepository;
     private final ClientRepository clientRepository;
     private final ScheduleRepository scheduleRepository;
 
+    /**
+     * Получает список всех активных записей на указанную дату сгруппированных по времени.
+     *
+     * @param date дата для получения отчета о записях
+     * @return список слотов с информацией о записанных клиентах {@link ReservedTimeSlotResponse}
+     */
     @Transactional
     @Override
     public List<ReservedTimeSlotResponse> getReservationsByDate(LocalDate date) {
@@ -80,6 +86,23 @@ public class ReservationServiceImpl implements ReservationService {
         return response;
     }
 
+    /**
+     * Создает запись клиента в бассейн.
+     * <p>
+     * Выполняет следующие проверки:
+     * 1. Существование клиента.
+     * 2. Валидация времени: сеансы должны начинаться в 00 минут, быть в один день и идти подряд.
+     * 3. Проверка праздников и рабочих часов согласно расписанию.
+     * 4. Проверка лимита посещений: не более 1 раза в день на человека.
+     * 5. Проверка вместимости: не более 10 человек в каждый из выбранных часов.
+     *
+     * @param request объект с данными бронирования (ID клиента и список времени)
+     * @return идентификатор первого созданного бронирования {@link CreateReservationResponse}
+     * @throws OutsideWorkingHoursException если время записи вне графика или сеансы не по порядку
+     * @throws NotWorkingException           если день праздничный
+     * @throws LimitExceededException        если превышен лимит "один раз в день"
+     * @throws NoAvailableSlotsException     если в выбранный час нет мест
+     */
     @Transactional
     @Override
     public CreateReservationResponse createReservation(CreateReservationRequest request) {
@@ -96,7 +119,7 @@ public class ReservationServiceImpl implements ReservationService {
         LocalDate bookingDate = dateTimes.get(0).toLocalDate();
 
         for (int i = 0; i < dateTimes.size(); i++) {
-            LocalDateTime current = dateTimes.get(0);
+            LocalDateTime current = dateTimes.get(i);
 
             if (!current.toLocalDate().equals(bookingDate)) {
                 throw new OutsideWorkingHoursException("Все выбранные сеансы должны быть в пределах одного дня");
@@ -139,27 +162,34 @@ public class ReservationServiceImpl implements ReservationService {
             }
         }
 
-        String firstReservationId = null;
+        UUID firstReservationId = null;
         for (int i = 0; i < dateTimes.size(); i++) {
             LocalDateTime dt = dateTimes.get(i);
             Reservation reservation = reservationRepository.createReservation(clientId, bookingDate, dt.toLocalTime());
 
-            // возвращаем id первой записи
             if (i == 0) {
                 firstReservationId = reservation.getId();
             }
         }
 
-        log.info("Запись {} успешно создана клиентом {}",
+        log.debug("Запись {} успешно создана клиентом {}",
                 firstReservationId, request.clientId());
 
         return new CreateReservationResponse(firstReservationId);
 
     }
 
+    /**
+     * Отменяет существующее бронирование.
+     * Выполняет проверку принадлежности записи клиенту перед отменой.
+     *
+     * @param request       данные об отмене (ID клиента и причина)
+     * @param reservationId UUID записи для отмены
+     * @throws IllegalArgumentException если запись не найдена или принадлежит другому клиенту
+     */
     @Transactional
     @Override
-    public void cancelReservation(CancelReservationRequest request, String reservationId) {
+    public void cancelReservation(CancelReservationRequest request, UUID reservationId) {
 
         boolean isCancelled = reservationRepository.deleteReservation(
                 reservationId,
@@ -171,9 +201,7 @@ public class ReservationServiceImpl implements ReservationService {
             throw new IllegalArgumentException("Запись не найдена, либо у вас нет прав на её отмену");
         }
 
-        log.info("Запись {} успешно отменена клиентом {}. Причина: {}",
+        log.debug("Запись {} успешно отменена клиентом {}. Причина: {}",
                 reservationId, request.clientId(), request.reason());
     }
-
-
 }

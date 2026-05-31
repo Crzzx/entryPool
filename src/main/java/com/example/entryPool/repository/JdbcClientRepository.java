@@ -13,6 +13,10 @@ import java.util.Optional;
 @Repository
 public class JdbcClientRepository implements ClientRepository {
     private final JdbcTemplate jdbcTemplate;
+    private final String ID = "id";
+    private final String NAME = "name";
+    private final String PHONE = "phone";
+    private final String EMAIL = "email";
 
     @Override
     public Optional<Client> findById(Long id) {
@@ -20,10 +24,10 @@ public class JdbcClientRepository implements ClientRepository {
         try {
             return jdbcTemplate.queryForObject(sql, (rs, rowNum) -> {
                 Client client = new Client();
-                client.setId(rs.getLong("id"));
-                client.setName(rs.getString("name"));
-                client.setPhone(rs.getString("phone"));
-                client.setEmail(rs.getString("email"));
+                client.setId(rs.getLong(ID));
+                client.setName(rs.getString(NAME));
+                client.setPhone(rs.getString(PHONE));
+                client.setEmail(rs.getString(EMAIL));
                 return Optional.of(client);
             }, id);
         } catch (EmptyResultDataAccessException e) {
@@ -38,18 +42,18 @@ public class JdbcClientRepository implements ClientRepository {
             String sql = "SELECT id, name FROM clients";
             return jdbcTemplate.query(sql, (rs, rowNum) -> {
                 Client client = new Client();
-                client.setId(rs.getLong("id"));
-                client.setName(rs.getString("name"));
+                client.setId(rs.getLong(ID));
+                client.setName(rs.getString(NAME));
                 return client;
             });
         } else {
             String sql = "SELECT id, name FROM clients WHERE name ILIKE ?";
-            String searchParam = "%" + name + "%"; // Оборачиваем для поиска по подстроке
+            String searchParam = "%" + name + "%";
 
             return jdbcTemplate.query(sql, (rs, rowNum) -> {
                 Client client = new Client();
-                client.setId(rs.getLong("id"));
-                client.setName(rs.getString("name"));
+                client.setId(rs.getLong(ID));
+                client.setName(rs.getString(NAME));
                 return client;
             }, searchParam);
         }
@@ -76,5 +80,4 @@ public class JdbcClientRepository implements ClientRepository {
         Integer count = jdbcTemplate.queryForObject(sql, Integer.class, phone);
         return count != null && count > 0;
     }
-
 }

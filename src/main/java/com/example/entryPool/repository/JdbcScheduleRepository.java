@@ -15,6 +15,10 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class JdbcScheduleRepository implements ScheduleRepository {
     private final JdbcTemplate jdbcTemplate;
+    private final String DATE = "date";
+    private final String IS_HOLIDAY = "is_holiday";
+    private final String OPEN_TIME = "open_time";
+    private final String CLOSE_TIME = "close_time";
 
 
     @Override
@@ -23,11 +27,11 @@ public class JdbcScheduleRepository implements ScheduleRepository {
         try {
             Schedule schedule = jdbcTemplate.queryForObject(sql, (rs, rowNum) -> {
                 Schedule s = new Schedule();
-                s.setDate(rs.getDate("date").toLocalDate());
-                s.setHoliday(rs.getBoolean("is_holiday"));
+                s.setDate(rs.getDate(DATE).toLocalDate());
+                s.setHoliday(rs.getBoolean(IS_HOLIDAY));
 
-                Time openTime = rs.getTime("open_time");
-                Time closeTime = rs.getTime("close_time");
+                Time openTime = rs.getTime(OPEN_TIME);
+                Time closeTime = rs.getTime(CLOSE_TIME);
 
                 s.setOpenTime(openTime != null ? openTime.toLocalTime() : null);
                 s.setCloseTime(closeTime != null ? closeTime.toLocalTime() : null);

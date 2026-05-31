@@ -8,8 +8,8 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
-@Repository
 public interface ReservationRepository {
     Map<LocalTime, Integer> getBookedCountByDate(LocalDate date);
 
@@ -21,5 +21,5 @@ public interface ReservationRepository {
 
     boolean existsByClientIdAndDate(Long clientId, LocalDate date);
 
-    boolean deleteReservation(String reservationId, Long clientId, String reason);
+    boolean deleteReservation(UUID reservationId, Long clientId, String reason);
 }

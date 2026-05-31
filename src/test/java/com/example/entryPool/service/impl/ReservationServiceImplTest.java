@@ -25,6 +25,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -59,6 +60,8 @@ class ReservationServiceImplTest {
     @DisplayName("Успешное создание брони на один час")
     void createReservation_Success() {
 
+        UUID generatedId = UUID.randomUUID();
+
         CreateReservationRequest request = new CreateReservationRequest(clientId, List.of("2026-05-30T10:00:00"));
 
         when(clientRepository.findById(clientId)).thenReturn(Optional.of(new Client()));
@@ -67,13 +70,13 @@ class ReservationServiceImplTest {
         when(reservationRepository.countReservations(bookingDate, LocalTime.of(10, 0))).thenReturn(5);
 
         Reservation mockRes = new Reservation();
-        mockRes.setId("uuid-123");
-        when(reservationRepository.createReservation(eq(clientId), eq(bookingDate), any())).thenReturn(mockRes);
+        mockRes.setId(generatedId);
+        when(reservationRepository.createReservation(any(), any(), any())).thenReturn(mockRes);
 
         CreateReservationResponse response = reservationService.createReservation(request);
 
         assertNotNull(response);
-        assertEquals("uuid-123", response.id());
+        assertEquals(generatedId, response.id());
         verify(reservationRepository).createReservation(eq(clientId), eq(bookingDate), eq(LocalTime.of(10, 0)));
     }
 
@@ -82,7 +85,7 @@ class ReservationServiceImplTest {
     void createReservation_HolidayError() {
 
         CreateReservationRequest request = new CreateReservationRequest(clientId, List.of("2026-05-30T10:00:00"));
-        standardSchedule.setHoliday(true); // Устанавливаем праздник
+        standardSchedule.setHoliday(true);
 
         when(clientRepository.findById(clientId)).thenReturn(Optional.of(new Client()));
         when(scheduleRepository.getSchedule(bookingDate)).thenReturn(Optional.of(standardSchedule));
@@ -145,21 +148,23 @@ class ReservationServiceImplTest {
     @DisplayName("Успешная отмена брони")
     void cancelReservation_Success() {
 
-        String resId = "uuid-123";
-        CancelReservationRequest request = new CancelReservationRequest(clientId, "Передумал");
+        UUID resId = UUID.randomUUID();
+        String reason = "Причина отмены";
+        CancelReservationRequest request = new CancelReservationRequest(clientId, reason);
 
-        when(reservationRepository.deleteReservation(resId, clientId, "Передумал")).thenReturn(true);
 
-        assertDoesNotThrow(() -> reservationService.cancelReservation(request, resId));
+        when(reservationRepository.deleteReservation(eq(resId), eq(clientId), any())).thenReturn(true);
 
-        verify(reservationRepository).deleteReservation(resId, clientId, "Передумал");
+        assertDoesNotThrow(() -> reservationService.cancelReservation(request, resId));;
+
+        verify(reservationRepository).deleteReservation(resId, clientId, reason);
     }
 
     @Test
     @DisplayName("Ошибка отмены: запись не найдена или чужая")
     void cancelReservation_NotFoundError() {
 
-        String resId = "wrong-uuid";
+        UUID resId = UUID.randomUUID();
         CancelReservationRequest request = new CancelReservationRequest(clientId, "Reason");
 
         when(reservationRepository.deleteReservation(resId, clientId, "Reason")).thenReturn(false);

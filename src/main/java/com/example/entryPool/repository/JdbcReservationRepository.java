@@ -19,8 +19,17 @@ import java.util.*;
 @RequiredArgsConstructor
 @Repository
 public class JdbcReservationRepository implements ReservationRepository{
-
     private final JdbcTemplate jdbcTemplate;
+    private final String RESERVATION_TIME = "reservation_time";
+    private final String BOOKED_COUNT = "booked_count";
+    private final String CLIENT_ID = "client_id";
+    private final String NAME = "name";
+    private final String PHONE = "phone";
+    private final String EMAIL = "email";
+    private final String RESERVATION_ID = "reservation_id";
+    private final String RESERVATION_DATE = "reservation_date";
+    private final String STATUS = "status";
+    private final String CANCEL_REASON = "cancel_reason";
 
     public Map<LocalTime, Integer> getBookedCountByDate(LocalDate date) {
         String sql = "SELECT reservation_time, COUNT(*) as booked_count " +
@@ -31,8 +40,8 @@ public class JdbcReservationRepository implements ReservationRepository{
             Map<LocalTime, Integer> map = new HashMap<>();
             while (rs.next()) {
                 map.put(
-                        rs.getTime("reservation_time").toLocalTime(),
-                        rs.getInt("booked_count")
+                        rs.getTime(RESERVATION_TIME).toLocalTime(),
+                        rs.getInt(BOOKED_COUNT)
                 );
             }
             return map;
@@ -41,6 +50,7 @@ public class JdbcReservationRepository implements ReservationRepository{
 
     public List<ReservationWithClient> getReservationsByDate(LocalDate date) {
         String sql = "SELECT r.id as reservation_id, r.reservation_date, r.reservation_time, " +
+                "r.status, r.cancel_reason, " +
                 "c.id as client_id, c.name, c.phone, c.email " +
                 "FROM reservations r " +
                 "JOIN clients c ON r.client_id = c.id " +
@@ -49,31 +59,38 @@ public class JdbcReservationRepository implements ReservationRepository{
 
         return jdbcTemplate.query(sql, (rs, rowNum) -> {
             Client client = new Client(
-                    rs.getLong("client_id"),
-                    rs.getString("name"),
-                    rs.getString("phone"),
-                    rs.getString("email")
+                    rs.getLong(CLIENT_ID),
+                    rs.getString(NAME),
+                    rs.getString(PHONE),
+                    rs.getString(EMAIL)
             );
 
             Reservation reservation = new Reservation();
-            reservation.setId(rs.getString("reservation_id"));
-            reservation.setClientId(rs.getLong("client_id"));
+            reservation.setId(rs.getObject(RESERVATION_ID, java.util.UUID.class));
+            reservation.setClientId(rs.getLong(CLIENT_ID));
 
-            LocalDate resDate = rs.getDate("reservation_date").toLocalDate();
-            LocalTime resTime = rs.getTime("reservation_time").toLocalTime();
-            reservation.setReservationTime(LocalDateTime.of(resDate, resTime));
+            java.sql.Date sqlDate = rs.getDate(RESERVATION_DATE);
+            java.sql.Time sqlTime = rs.getTime(RESERVATION_TIME);
 
-            reservation.setStatus(ReservationStatus.valueOf(rs.getString("status")));
-            reservation.setCancelReason(rs.getString("cancel_reason"));
+            if (sqlDate != null && sqlTime != null) {
+                reservation.setReservationTime(LocalDateTime.of(sqlDate.toLocalDate(), sqlTime.toLocalTime()));
+            }
+
+            String statusStr = rs.getString(STATUS);
+            if (statusStr != null) {
+                reservation.setStatus(ReservationStatus.valueOf(statusStr));
+            }
+
+            reservation.setCancelReason(rs.getString(CANCEL_REASON));
 
             return new ReservationWithClient(reservation, client);
-        }, date);
+        }, java.sql.Date.valueOf(date));
     }
 
     public Reservation createReservation(Long clientId, LocalDate date, LocalTime time){
+        UUID id = UUID.randomUUID();
+        String defaultStatus = ReservationStatus.ACTIVE.name();
 
-        String id = UUID.randomUUID().toString();
-        String defaultStatus = "ACTIVE";
         String sql = "INSERT INTO reservations (id, client_id, reservation_date, reservation_time, status) " +
                 "VALUES (?, ?, ?, ?, ?)";
 
@@ -90,7 +107,7 @@ public class JdbcReservationRepository implements ReservationRepository{
         reservation.setId(id);
         reservation.setClientId(clientId);
         reservation.setReservationTime(LocalDateTime.of(date, time));
-        reservation.setStatus(ReservationStatus.valueOf(defaultStatus));
+        reservation.setStatus(ReservationStatus.ACTIVE);
         reservation.setCancelReason(null);
 
         return reservation;
@@ -107,12 +124,11 @@ public class JdbcReservationRepository implements ReservationRepository{
         return count != null && count > 0;
     }
 
-    public boolean deleteReservation(String reservationId, Long clientId, String reason) {
-        String sql = "UPDATE reservations SET status = 'CANCELLED', cancel_reason = ? \" +\n" +
-                "\"WHERE id = ? AND client_id = ? AND status = 'ACTIVE'";
+    public boolean deleteReservation(UUID reservationId, Long clientId, String reason) {
+        String sql = "UPDATE reservations SET status = 'CANCELLED', cancel_reason = ? " +
+                "WHERE id = ? AND client_id = ? AND status = 'ACTIVE'";
 
         int rowsAffected = jdbcTemplate.update(sql, reason, reservationId, clientId);
         return rowsAffected > 0;
     }
-
 }
