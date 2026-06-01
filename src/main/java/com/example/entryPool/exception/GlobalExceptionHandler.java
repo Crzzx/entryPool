@@ -19,7 +19,6 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     @ResponseStatus(HttpStatus.METHOD_NOT_ALLOWED)
     public ErrorResponse handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
-        // Вместо 500 ошибки возвращаем 405 (Метод не поддерживается)
         return new ErrorResponse(
                 HttpStatus.METHOD_NOT_ALLOWED.value(),
                 "Method Not Allowed",
@@ -30,7 +29,6 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NoResourceFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ErrorResponse handleNoResourceFound(NoResourceFoundException ex) {
-        // Логируем это как дебаг или инфо, а не как ERROR, чтобы не спамить в консоль
         log.warn("Статический ресурс не найден: {}", ex.getResourcePath());
 
         return new ErrorResponse(

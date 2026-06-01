@@ -102,7 +102,7 @@ class ReservationServiceImplTest {
         when(clientRepository.findById(clientId)).thenReturn(Optional.of(new Client()));
         when(scheduleRepository.getSchedule(bookingDate)).thenReturn(Optional.of(standardSchedule));
         when(reservationRepository.existsByClientIdAndDate(clientId, bookingDate)).thenReturn(false);
-        when(reservationRepository.countReservations(bookingDate, LocalTime.of(10, 0))).thenReturn(10); // Слот полон
+        when(reservationRepository.countReservations(bookingDate, LocalTime.of(10, 0))).thenReturn(10);
 
         assertThrows(NoAvailableSlotsException.class, () -> reservationService.createReservation(request));
     }
@@ -115,9 +115,8 @@ class ReservationServiceImplTest {
 
         when(clientRepository.findById(clientId)).thenReturn(Optional.of(new Client()));
         when(scheduleRepository.getSchedule(bookingDate)).thenReturn(Optional.of(standardSchedule));
-        when(reservationRepository.existsByClientIdAndDate(clientId, bookingDate)).thenReturn(true); // Уже записан
+        when(reservationRepository.existsByClientIdAndDate(clientId, bookingDate)).thenReturn(true);
 
-        // When & Then
         assertThrows(LimitExceededException.class, () -> reservationService.createReservation(request));
     }
 
